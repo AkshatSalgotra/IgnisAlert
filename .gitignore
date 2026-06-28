@@ -1,0 +1,16 @@
+.venv/
+.venv311/
+.vscode/
+runs/
+detections/
+dataset/
+best.pt
+yolov8m.pt
+yolo26n.pt
+*.pt
+snapshot_*.jpg
+.env
+__pycache__/
+*.pyc
+*.pyo
+pyvenv.cfg
