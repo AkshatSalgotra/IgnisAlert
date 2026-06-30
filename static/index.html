@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IgnisAlert Dashboard</title>
+  <style>
+    :root {
+      --bg:       #0d1117;
+      --card:     #161b22;
+      --border:   #30363d;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --accent:   #f97316;
+      --critical: #ef4444;
+      --high:     #f97316;
+      --moderate: #eab308;
+      --low:      #22c55e;
+      --unknown:  #6b7280;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      padding: 0.875rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .logo {
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+    }
+    .logo span { color: var(--text); }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--low);
+      animation: blink 1.4s ease-in-out infinite;
+    }
+    .dot.offline { background: var(--unknown); animation: none; }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    main {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .card-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 1rem 1.25rem 0;
+    }
+
+    /* ── Top grid ────────────────────────────────────────── */
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 1.25rem;
+    }
+
+    /* Video column (video card + source bar stacked) */
+    .video-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* Video card */
+    .video-wrap {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      min-height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-wrap img {
+      width: 100%;
+      display: block;
+      border-radius: 10px;
+    }
+
+    /* Empty / waiting state shown before any source is set */
+    .video-idle {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 3rem 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+      width: 100%;
+    }
+
+    .video-idle-icon {
+      font-size: 2.5rem;
+      opacity: 0.4;
+    }
+
+    .video-overlay-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      backdrop-filter: blur(6px);
+    }
+
+    /* Drag-and-drop overlay */
+    .drag-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(249, 115, 22, 0.15);
+      border: 2px dashed var(--accent);
+      border-radius: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .drag-overlay.active { display: flex; }
+
+    .drag-overlay-inner {
+      color: var(--accent);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    /* Source control bar */
+    .source-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 1rem;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .source-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .source-name {
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .source-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: rgba(255,255,255,0.06); border-color: var(--muted); }
+
+    .btn-primary {
+      background: rgba(249,115,22,0.12);
+      border-color: rgba(249,115,22,0.35);
+      color: #fb923c;
+    }
+    .btn-primary:hover { background: rgba(249,115,22,0.22); }
+
+    .btn-upload-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-upload-label:hover { background: rgba(255,255,255,0.06); border-color: var(--muted); }
+
+    /* Upload progress */
+    .upload-status {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 4px;
+      display: none;
+    }
+    .upload-status.loading { display: inline-block; color: #fb923c; }
+    .upload-status.ok      { display: inline-block; color: #4ade80; }
+    .upload-status.err     { display: inline-block; color: #f87171; }
+
+    /* Right panel */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* Risk card */
+    .risk-main {
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .risk-main .card-title { padding: 0 0 0.75rem; }
+
+    .risk-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 0.4rem;
+      transition: color 0.4s;
+    }
+
+    .risk-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      min-height: 1.2em;
+    }
+
+    .frame-count {
+      margin-top: 0.6rem;
+      font-size: 0.72rem;
+      color: var(--border);
+    }
+
+    /* Weather card */
+    .weather-card { padding: 1rem 1.25rem 1.25rem; }
+
+    .weather-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .w-item { text-align: center; }
+    .w-val  { font-size: 1.15rem; font-weight: 600; }
+    .w-key  { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-top: 0.15rem; }
+
+    .bar-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .bar-bg {
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .fwi-fill { background: linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444); }
+
+    /* Dry veg card */
+    .dryveg-card { padding: 1rem 1.25rem 1.25rem; }
+
+    .dryveg-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .dryveg-pct {
+      font-size: 1.05rem;
+      font-weight: 600;
+      min-width: 3.5rem;
+      text-align: right;
+      color: #ca8a04;
+    }
+
+    .dryveg-status { font-size: 0.72rem; color: var(--muted); }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+    }
+
+    .stat-card { padding: 1rem 1.25rem; text-align: center; }
+
+    .stat-val {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-top: 0.35rem;
+    }
+
+    /* Detection table */
+    .table-card { padding: 1.25rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+
+    th {
+      text-align: left;
+      padding: 0.45rem 0.75rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(48,54,61,0.4);
+      vertical-align: middle;
+    }
+
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .empty { text-align: center; color: var(--muted); padding: 2.5rem; font-size: 0.85rem; }
+
+    .pill {
+      display: inline-block;
+      padding: 0.18rem 0.55rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+
+    .pill-CRITICAL { background: rgba(239,68,68,0.18);  color: #f87171; }
+    .pill-HIGH     { background: rgba(249,115,22,0.18); color: #fb923c; }
+    .pill-MODERATE { background: rgba(234,179,8,0.18);  color: #facc15; }
+    .pill-LOW      { background: rgba(34,197,94,0.18);  color: #4ade80; }
+    .pill-UNKNOWN  { background: rgba(107,114,128,0.18); color: #9ca3af; }
+
+    .chip {
+      display: inline-block;
+      background: rgba(249,115,22,0.12);
+      color: #fb923c;
+      border: 1px solid rgba(249,115,22,0.25);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.68rem;
+      margin: 0.1rem;
+    }
+
+    .alert-yes { color: #f87171; font-size: 0.75rem; }
+    .alert-no  { color: var(--border); font-size: 0.75rem; }
+
+    /* Risk badge variants */
+    .rb-CRITICAL { background: rgba(239,68,68,0.22);  color: #f87171; border: 1px solid rgba(239,68,68,0.4); }
+    .rb-HIGH     { background: rgba(249,115,22,0.22); color: #fb923c; border: 1px solid rgba(249,115,22,0.4); }
+    .rb-MODERATE { background: rgba(234,179,8,0.22);  color: #facc15; border: 1px solid rgba(234,179,8,0.4); }
+    .rb-LOW      { background: rgba(34,197,94,0.22);  color: #4ade80; border: 1px solid rgba(34,197,94,0.4); }
+    .rb-UNKNOWN  { background: rgba(107,114,128,0.22); color: #9ca3af; border: 1px solid rgba(107,114,128,0.4); }
+
+    .color-CRITICAL { color: #ef4444; }
+    .color-HIGH     { color: #f97316; }
+    .color-MODERATE { color: #eab308; }
+    .color-LOW      { color: #22c55e; }
+    .color-UNKNOWN  { color: #6b7280; }
+
+    @media (max-width: 960px) {
+      .top-grid   { grid-template-columns: 1fr; }
+      .stats-row  { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 480px) {
+      .stats-row  { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🔥 Ignis<span>Alert</span></div>
+  <div class="live-badge">
+    <div class="dot" id="dot"></div>
+    <span id="live-text">Connecting…</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Top: video col + right panel -->
+  <div class="top-grid">
+
+    <!-- Left: video + source bar -->
+    <div class="video-col" id="video-col">
+
+      <!-- Video card (drag-and-drop target) -->
+      <div class="card video-wrap" id="video-wrap">
+        <!-- Shown once a source is active -->
+        <img id="video-img" src="/video_feed" alt="Live detection feed" style="display:none"
+             onload="this.style.display='block'; document.getElementById('video-idle').style.display='none'">
+
+        <!-- Idle state before any source -->
+        <div class="video-idle" id="video-idle">
+          <div class="video-idle-icon">🎥</div>
+          <div>No source selected</div>
+          <div style="font-size:0.75rem">Use webcam or drop an image / video below</div>
+        </div>
+
+        <!-- Risk badge overlay -->
+        <div class="video-overlay-badge rb-UNKNOWN" id="overlay-badge" style="display:none">● UNKNOWN</div>
+
+        <!-- Drag-and-drop highlight -->
+        <div class="drag-overlay" id="drag-overlay">
+          <div class="drag-overlay-inner">Drop image or video to analyse</div>
+        </div>
+      </div>
+
+      <!-- Source control bar -->
+      <div class="card source-bar">
+        <div class="source-label">
+          Source:&nbsp;<span class="source-name" id="source-name">none</span>
+        </div>
+        <div class="source-actions">
+          <span class="upload-status" id="upload-status"></span>
+          <button class="btn btn-primary" onclick="switchToWebcam()">📷 Webcam</button>
+          <label class="btn-upload-label">
+            📁 Upload
+            <input type="file" id="file-input" accept="image/*,video/*,.mp4,.avi,.mov,.mkv"
+                   style="display:none" onchange="uploadFile(this.files[0])">
+          </label>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right panel -->
+    <div class="right-panel">
+
+      <!-- Current risk -->
+      <div class="card risk-main">
+        <div class="card-title">Overall Risk</div>
+        <div class="risk-value color-UNKNOWN" id="risk-val">—</div>
+        <div class="risk-sub" id="risk-sub">Waiting for detection…</div>
+        <div class="frame-count" id="frame-ct">Frame #0</div>
+      </div>
+
+      <!-- Weather -->
+      <div class="card weather-card">
+        <div class="card-title" style="padding:0 0 0.75rem">Weather · FWI</div>
+        <div class="weather-grid">
+          <div class="w-item">
+            <div class="w-val" id="w-temp">—</div>
+            <div class="w-key">Temp °C</div>
+          </div>
+          <div class="w-item">
+            <div class="w-val" id="w-hum">—</div>
+            <div class="w-key">Humidity %</div>
+          </div>
+          <div class="w-item">
+            <div class="w-val" id="w-wind">—</div>
+            <div class="w-key">Wind km/h</div>
+          </div>
+          <div class="w-item">
+            <div class="w-val" id="w-rain">—</div>
+            <div class="w-key">Rain mm</div>
+          </div>
+        </div>
+        <div class="bar-row">
+          <span>Fire Weather Index</span>
+          <span id="fwi-label">—</span>
+        </div>
+        <div class="bar-bg">
+          <div class="bar-fill fwi-fill" id="fwi-bar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Dry vegetation -->
+      <div class="card dryveg-card">
+        <div class="card-title" style="padding:0 0 0.75rem">Dry Vegetation Coverage</div>
+        <div class="dryveg-row">
+          <div style="flex:1">
+            <div class="bar-bg">
+              <div class="bar-fill" id="dveg-bar"
+                   style="width:0%; background:#ca8a04;"></div>
+            </div>
+          </div>
+          <div class="dryveg-pct" id="dveg-pct">0%</div>
+        </div>
+        <div class="dryveg-status" id="dveg-status">No dry vegetation detected</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="card stat-card">
+      <div class="stat-val" id="s-total">0</div>
+      <div class="stat-label">Total Events</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-val" style="color:#ef4444" id="s-critical">0</div>
+      <div class="stat-label">Critical</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-val" style="color:#f97316" id="s-high">0</div>
+      <div class="stat-label">High Risk</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-val" id="s-alerts">0</div>
+      <div class="stat-label">Alerts Sent</div>
+    </div>
+  </div>
+
+  <!-- Detection history -->
+  <div class="card table-card">
+    <div class="card-title" style="padding:0 0 1rem">Detection History</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Risk</th>
+          <th>Detected Classes</th>
+          <th>Dry Veg</th>
+          <th>FWI</th>
+          <th>Temp</th>
+          <th>Alert</th>
+        </tr>
+      </thead>
+      <tbody id="det-tbody">
+        <tr><td colspan="7" class="empty">No events logged yet</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</main>
+
+<script>
+  function el(id) { return document.getElementById(id); }
+
+  // ── Source controls ────────────────────────────────────────
+  async function switchToWebcam() {
+    setUploadStatus('loading', 'Starting webcam…');
+    try {
+      await fetch('/api/source/webcam', { method: 'POST' });
+      reloadFeed();
+      setUploadStatus('ok', 'Webcam active');
+      setTimeout(() => setUploadStatus('', ''), 3000);
+    } catch {
+      setUploadStatus('err', 'Failed');
+    }
+  }
+
+  async function uploadFile(file) {
+    if (!file) return;
+    setUploadStatus('loading', `Uploading ${file.name}…`);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const r = await fetch('/api/upload', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error();
+      reloadFeed();
+      setUploadStatus('ok', `Loaded: ${file.name}`);
+      setTimeout(() => setUploadStatus('', ''), 4000);
+    } catch {
+      setUploadStatus('err', 'Upload failed');
+    }
+    // reset input so same file can be re-uploaded
+    el('file-input').value = '';
+  }
+
+  function reloadFeed() {
+    // Force the MJPEG stream to reconnect by adding a cache-busting param
+    const img = el('video-img');
+    img.style.display = 'none';
+    el('video-idle').style.display = 'flex';
+    setTimeout(() => {
+      img.src = '/video_feed?' + Date.now();
+      img.style.display = 'block';
+      el('video-idle').style.display = 'none';
+      el('overlay-badge').style.display = 'block';
+    }, 800);
+  }
+
+  function setUploadStatus(type, msg) {
+    const s = el('upload-status');
+    s.className = 'upload-status' + (type ? ` ${type}` : '');
+    s.textContent = msg;
+  }
+
+  // ── Drag-and-drop ──────────────────────────────────────────
+  const videoCol = el('video-col');
+  let dragCounter = 0;
+
+  videoCol.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragCounter++;
+    el('drag-overlay').classList.add('active');
+  });
+
+  videoCol.addEventListener('dragleave', () => {
+    dragCounter--;
+    if (dragCounter === 0) el('drag-overlay').classList.remove('active');
+  });
+
+  videoCol.addEventListener('dragover', e => e.preventDefault());
+
+  videoCol.addEventListener('drop', e => {
+    e.preventDefault();
+    dragCounter = 0;
+    el('drag-overlay').classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+  });
+
+  // ── Status polling (every 2 s) ─────────────────────────────
+  let _prevSource = null;
+
+  async function pollStatus() {
+    try {
+      const d = await fetch('/api/status').then(r => r.json());
+
+      el('dot').className = d.running ? 'dot' : 'dot offline';
+      el('live-text').textContent = d.running
+        ? `Live · Frame ${d.frame_count}`
+        : (d.source === 'none' ? 'No source — upload or use webcam' : 'Detection stopped');
+
+      const risk = d.risk_level || 'UNKNOWN';
+
+      el('overlay-badge').textContent = `● ${risk}`;
+      el('overlay-badge').className   = `video-overlay-badge rb-${risk}`;
+      if (d.running) el('overlay-badge').style.display = 'block';
+
+      el('risk-val').textContent = risk;
+      el('risk-val').className   = `risk-value color-${risk}`;
+
+      const classes = d.det_classes || [];
+      el('risk-sub').textContent = classes.length
+        ? `Detected: ${classes.join(', ')}`
+        : d.dry_veg_detected ? 'Dry vegetation present' : 'No active threat';
+
+      el('frame-ct').textContent = `Frame #${d.frame_count}`;
+
+      // Source label
+      const src = d.source || 'none';
+      el('source-name').textContent = src;
+      if (src !== _prevSource && src !== 'none') {
+        _prevSource = src;
+      }
+
+      // Weather
+      if (d.weather) {
+        const w = d.weather;
+        el('w-temp').textContent  = w.temp      ?? '—';
+        el('w-hum').textContent   = w.humidity  ?? '—';
+        el('w-wind').textContent  = w.wind      ?? '—';
+        el('w-rain').textContent  = w.rain      ?? '—';
+        const fwi = w.fwi || 0;
+        el('fwi-label').textContent = `${fwi} · ${w.label}`;
+        el('fwi-bar').style.width   = Math.min((fwi / 50) * 100, 100) + '%';
+      }
+
+      // Dry vegetation
+      const ratio = d.dry_veg_ratio || 0;
+      const pct   = (ratio * 100).toFixed(1);
+      el('dveg-bar').style.width    = pct + '%';
+      el('dveg-pct').textContent    = pct + '%';
+      el('dveg-status').textContent = d.dry_veg_detected
+        ? `⚠ Dry vegetation — ${pct}% of frame`
+        : 'No dry vegetation detected';
+      el('dveg-status').style.color = d.dry_veg_detected ? '#ca8a04' : 'var(--muted)';
+
+    } catch { /* server not ready */ }
+  }
+
+  // ── Stats + history polling (every 10 s) ───────────────────
+  async function pollStats() {
+    try {
+      const s = await fetch('/api/stats').then(r => r.json());
+      el('s-total').textContent    = s.total       || 0;
+      el('s-critical').textContent = s.critical    || 0;
+      el('s-high').textContent     = s.high        || 0;
+      el('s-alerts').textContent   = s.alerts_sent || 0;
+    } catch {}
+  }
+
+  async function pollDetections() {
+    try {
+      const rows = await fetch('/api/detections?limit=25').then(r => r.json());
+      const tbody = el('det-tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No events logged yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const ts      = new Date(r.timestamp).toLocaleString();
+        const classes = (r.det_classes || '').split(',').filter(Boolean);
+        const chips   = classes.map(c => `<span class="chip">${c}</span>`).join('')
+                        || '<span style="color:var(--muted)">—</span>';
+        const dryPct  = r.dry_veg_ratio ? (r.dry_veg_ratio * 100).toFixed(1) + '%' : '—';
+        const fwi     = r.fwi_score != null ? `${r.fwi_score} (${r.fwi_label})` : '—';
+        const temp    = r.temp      != null ? `${r.temp}°C` : '—';
+        const alert   = r.alert_sent
+          ? '<span class="alert-yes">✓ Sent</span>'
+          : '<span class="alert-no">—</span>';
+        return `
+          <tr>
+            <td style="color:var(--muted);white-space:nowrap">${ts}</td>
+            <td><span class="pill pill-${r.risk_level}">${r.risk_level}</span></td>
+            <td>${chips}</td>
+            <td>${dryPct}</td>
+            <td style="color:var(--muted)">${fwi}</td>
+            <td style="color:var(--muted)">${temp}</td>
+            <td>${alert}</td>
+          </tr>`;
+      }).join('');
+    } catch {}
+  }
+
+  // Boot
+  pollStatus();
+  pollStats();
+  pollDetections();
+  setInterval(pollStatus, 2000);
+  setInterval(() => { pollStats(); pollDetections(); }, 10000);
+</script>
+
+</body>
+</html>
